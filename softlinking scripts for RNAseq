@@ -1,0 +1,323 @@
+####################### softlinking scripts for RNAseq ##########################
+## This script is used for creating new softlinks from the project folder to analysis folder of bulk RNAseq results
+## Edit input parameters, save and run the whole script on lsf cluster
+
+#####----------- required input ----------#####
+# define path to view-by-pid in project folder 
+project_folder = "/icgc/dkfzlsdf/project/OE0211/mm-sp3/sequencing/rna_sequencing/view-by-pid"
+
+# define output directory/analysis folder (results_per_pid)
+outdir= "/icgc/dkfzlsdf/analysis/OE0211_projects/mm-sp3/rna_sequencing/results_per_pid"
+
+# define PID list (character vector), can be individual cases or the whole cohort 
+PID = list.files(project_folder)
+#PID = scan(file = "path to txt", sep = "\t") # if the PID list comes from a txt file, it can be read by ths way
+#PID = "test" # single ID
+#PID = c("OE0211_MM-SP3_P001", "OE0211_MM-SP3_P002") # multiple IDs 
+
+
+# exclude specific PID(s) from the whole PID list when necessary (character vector)
+excludePID = "OE0211_MM-SP3_P129"
+
+
+# define specific sampletype (if there's more than one sample per patient) to link if necessary, default value is NULL
+# make sure you type the correct sampletype (character vector with quation mark, e.g. "tumor1")
+sampletype = NULL 
+
+
+################################################
+#####------- DO NOT change below    -------#####
+################################################
+cat("Starting QC input... \n")
+if(!file.exists(outdir)){
+    dir.create(outdir)
+    setwd(outdir)
+} else {print("The output directory has been created.")}
+
+###---------------QC input-------------------###
+## QC input project_folder
+if(file.exists(project_folder)==FALSE){
+    stop("The project folder doesn't exist! \n")
+    } else {cat("User defined project folder is:", project_folder, "\n")} 
+       
+## QC input PID
+if(length(PID)==0){
+    stop("No PID entered! \n")
+} else if(all(PID %in% list.files(project_folder))==FALSE){
+       stop("The PID(s) below DO NOT exist: ", PID[which(PID %in% list.files(project_folder)==F)], " \n")
+} else if (length(excludePID)>=1){
+            PID = PID[-match(excludePID,PID)]
+            cat(length(PID), "patients are selected \n")
+            } 
+
+## QC input output directory
+if(file.exists(outdir)==FALSE){
+    stop("The output folder doesn't exist! \n")  
+} else {cat("User defined project folder is:", project_folder, "\n")} 
+
+## QC input sampletypes
+viewtypes =  Sys.glob(paste0(project_folder, "/*/"))
+Allsampletypes= unique(list.dirs(viewtypes, recursive=F, full.names=F )) 
+
+if(length(sampletype) == 0){
+    cat("No specific sampletype is selected, will link all \n")
+} else if(all(sampletype %in% Allsampletypes)==F){ 
+    stop("The input sampletype is not existing!")
+} else{
+    cat("User defined sampletype(s):", sampletype, "\n")
+}
+
+cat("End of QC input... \n")
+###---------------End of QC input-------------------###
+
+
+### Creating file structure, there are 6 folders under patient (PID) in the analysis folder
+subfolders = c("alignment", "featureCounts", "featureCounts_dexseq", "fusions_arriba", "qualitycontrol", "roddyExecutionStore")
+cat("Creating file structure for each case: ", subfolders, "\n")
+
+if (length(PID)>=1){
+    for (i in seq_along(PID)){
+        # create alignment folder 
+        outpath = paste0(outdir, "/", PID[i], "/", "alignment")
+        ifelse(dir.exists(outpath)==TRUE,print("alignment dir already exists"),dir.create(outpath,recursive = TRUE))
+        
+        # create featureCounts folder
+        outpath = paste0(outdir, "/", PID[i], "/", "featureCounts")
+        ifelse(dir.exists(outpath)==TRUE,print("featureCounts dir already exists"),dir.create(outpath,recursive = TRUE))
+        
+        # create featureCounts_dexseq folder
+        outpath = paste0(outdir, "/", PID[i], "/", "featureCounts_dexseq")
+        ifelse(dir.exists(outpath)==TRUE,print("featureCounts_dexseq dir already exists"),dir.create(outpath,recursive = TRUE))
+        
+        # create fusions_arriba folder 
+        outpath = paste0(outdir, "/", PID[i], "/", "fusions_arriba")
+        ifelse(dir.exists(outpath)==TRUE,print("fusions_arriba dir already exists"),dir.create(outpath,recursive = TRUE))
+        
+        # create qualitycontrol folder 
+        outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol")
+        ifelse(dir.exists(outpath)==TRUE,print("qualitycontrol dir already exists"),dir.create(outpath,recursive = TRUE))
+        
+        # create roddyExecutionStore folder 
+        outpath = paste0(outdir, "/", PID[i], "/", "roddyExecutionStore")
+        ifelse(dir.exists(outpath)==TRUE,print("roddyExecutionStore dir already exists"),dir.create(outpath,recursive = TRUE))
+        
+    }
+} else {
+    stop("please enter PID")
+}
+
+### Solving sample types (in case there is more than 1 sample)
+cat("Checking existing sample types... \n")
+multiSample = 0; singleSample =0
+multiSamplePID = NULL; singleSamplePID = NULL
+
+
+if (is.null(sampletype)){
+    cat("No specific Sampletype is specified. \n")
+    if (length(PID)>=1){
+        for (i in seq_along(PID)){
+            Path_PID = paste0(project_folder, "/", PID[i], "/")
+            SampleType = list.files(Path_PID)  # list all samples under this PID 
+            
+            if (length(SampleType)>1){
+                multiSample = multiSample + 1
+                multiSamplePID = c(multiSamplePID, PID[i])
+            } else if(length(SampleType)==1){
+                singleSample = singleSample + 1
+                singleSamplePID = c(singleSamplePID, PID[i])
+        }
+                SampleType <- sampletype # reset SampleType as input
+        }
+    } else {
+        cat("Sampletype is specified as: ", sampletype )
+    }
+    cat(multiSample, "patient(s) have more than 1 samples", "\n")
+    if (multiSample>0){cat("List of PIDs with multiple samples: ", multiSamplePID, "\n") }       
+}   
+
+
+
+##################################################################################################
+### Creating softlinks in alignment folders, if not specified, all sample files will be linked 
+##################################################################################################
+cat("Creating softlinks in alignment folders for all selected patients... \n")
+
+if (length(PID)>=1 & is.null(sampletype)){
+    
+    for (i in seq_along(PID)){
+            
+            outpath = paste0(outdir, "/", PID[i], "/", "alignment")
+            SampleType = list.files(paste0(project_folder, "/", PID[i], "/"))
+            
+            # Link alignment files
+            bamfiles = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/*.bam")
+            file.symlink(from= Sys.glob(bamfiles), to= outpath)
+            
+            
+            # Link indices files
+            indexfiles = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/*.bai")
+            file.symlink(from= Sys.glob(indexfiles), to= outpath)
+            
+            # Link md5 files
+            md5files = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/*.md5")
+            file.symlink(from= Sys.glob(md5files), to= outpath)
+            
+            # Link flagstat files
+            flagfiles = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/*.flagstat")
+            file.symlink(from= Sys.glob(flagfiles), to= outpath)
+            
+            # Link log files
+            logfiles = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/*star_logs_and_files")
+            file.symlink(from= Sys.glob(logfiles), to= outpath)
+            
+            # Link junction files
+            junctionfiles = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/*junction")
+            file.symlink(from= Sys.glob(junctionfiles), to= outpath)
+            
+    } else if (length(PID)>=1 & is.null(sampletype)==F){ #if user specify a sampletype (for more than one samples per patient)
+        
+        for (i in seq_along(PID)){
+            
+            outpath = paste0(outdir, "/", PID[i], "/", "alignment")
+            
+            if (all(unique(sampletype) %in% SampleType==T)) {
+                # Link alignment files
+                bamfiles = paste0(project_folder, "/", PID[i], "/",sampletype, "/paired/merged-alignment/*.bam") # will produce multiple paths if there are more than 1 sampletype
+                file.symlink(from= Sys.glob(bamfiles), to= outpath)
+                
+                # Link indices files
+                indexfiles = paste0(project_folder, "/", PID[i], "/",sampletype, "/paired/merged-alignment/*.bai")
+                file.symlink(from= Sys.glob(indexfiles), to= outpath)
+                
+                # Link md5 files
+                md5files = paste0(project_folder, "/", PID[i], "/", sampletype, "/paired/merged-alignment/*.md5")
+                file.symlink(from= Sys.glob(md5files), to= outpath)
+                
+                # Link flagstat files
+                flagfiles = paste0(project_folder, "/", PID[i], "/", sampletype, "/paired/merged-alignment/*.flagstat")
+                file.symlink(from= Sys.glob(flagfiles), to= outpath)
+                
+                # Link log files
+                logfiles = paste0(project_folder, "/", PID[i], "/",sampletype,"/paired/merged-alignment/*star_logs_and_files")
+                file.symlink(from= logfiles, to= outpath)
+                
+                # Link junction files
+                junctionfiles = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/*junction")
+                file.symlink(from= Sys.glob(junctionfiles), to= outpath)
+            }
+            
+        } else {
+            stop("please enter PID")
+        } 
+    } 
+}
+
+
+##################################################################################################
+### Creating softlinks in featureCounts folder, if not specified, all sample files will be linked 
+##################################################################################################   
+cat("Creating softlinks in featureCounts folders for all selected patients... \n")
+if (length(PID)>=1 & is.null(sampletype)){  
+    for (i in seq_along(PID)){
+        # Link featureCounts files
+        inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/featureCounts/*")       
+        outpath = paste0(outdir, "/", PID[i], "/", "featureCounts")
+        file.symlink(from= Sys.glob(inputpath), to= outpath)
+        }
+    } else if (length(PID)>=1 & is.null(sampletype)==F){ # if user specify a sample type
+        
+        for (i in seq_along(PID)){
+            # Link featureCounts files
+            inputpath = paste0(project_folder, "/", PID[i], "/",sampletype,"/paired/merged-alignment/featureCounts/*")       
+            outpath = paste0(outdir, "/", PID[i], "/", "featureCounts")
+            file.symlink(from= Sys.glob(inputpath), to= outpath)
+        }
+    } 
+
+##################################################################################################
+### Creating softlinks in the featureCounts_dexseq folder, if not specified, all sample files will be linked 
+##################################################################################################  
+cat("Creating softlinks in featureCounts_dexseq folders for all selected patients... \n")
+if (length(PID)>=1 & is.null(sampletype)){
+    for (i in seq_along(PID)){
+        # Link featureCounts files
+        inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/featureCounts_dexseq/*")       
+        outpath = paste0(outdir, "/", PID[i], "/", "featureCounts_dexseq")
+        file.symlink(from= Sys.glob(inputpath), to= outpath)
+        }    
+    } else if (length(PID)>=1 & is.null(sampletype)==F){ # if user specify a sample type
+            
+        for (i in seq_along(PID)){
+            # Link featureCounts files
+            inputpath = paste0(project_folder, "/", PID[i], "/",sampletype,"/paired/merged-alignment/featureCounts_dexseq/*")       
+            outpath = paste0(outdir, "/", PID[i], "/", "featureCounts_dexseq")
+            file.symlink(from= Sys.glob(inputpath), to= outpath)
+        }
+    } 
+
+##################################################################################################
+### Creating softlinks in fusions_arriba folder, if not specified, all sample files will be linked 
+##################################################################################################  
+cat("Creating softlinks in fusions_arriba folders for all selected patients... \n")
+if (length(PID)>=1 & is.null(sampletype)){
+    for (i in seq_along(PID)){
+        # Link featureCounts files
+        inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/fusions_arriba/*")       
+        outpath = paste0(outdir, "/", PID[i], "/", "fusions_arriba")
+        file.symlink(from= Sys.glob(inputpath), to= outpath)
+        }   
+    } else if (length(PID)>=1 & is.null(sampletype)==F){ # if user specify a sample type
+            
+        for (i in seq_along(PID)){
+            # Link featureCounts files
+            inputpath = paste0(project_folder, "/", PID[i], "/",sampletype,"/paired/merged-alignment/fusions_arriba/*")       
+            outpath = paste0(outdir, "/", PID[i], "/", "fusions_arriba")
+            file.symlink(from= Sys.glob(inputpath), to= outpath)
+            }
+    } 
+ 
+##################################################################################################
+### Creating softlinks in qualitycontrol folder, if not specified, all sample files will be linked 
+##################################################################################################
+cat("Creating softlinks in qualitycontrol folders for all selected patients... \n")
+
+if (length(PID)>=1 & is.null(sampletype)){
+    for (i in seq_along(PID)){
+        # Link featureCounts files
+        inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/qualitycontrol/*")       
+        outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol")
+        file.symlink(from= Sys.glob(inputpath), to= outpath)
+        }   
+    } else if (length(PID)>=1 & is.null(sampletype)==F){ # if user specify a sample type
+            
+        for (i in seq_along(PID)){
+            # Link featureCounts files
+            inputpath = paste0(project_folder, "/", PID[i], "/",sampletype,"/paired/merged-alignment/qualitycontrol/*")       
+            outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol")
+            file.symlink(from= Sys.glob(inputpath), to= outpath)
+            }
+    }  
+
+##################################################################################################
+### Creating softlinks in roddyExecutionStore folder, if not specified, all sample files will be linked 
+##################################################################################################
+cat("Creating softlinks in roddyExecutionStore folders for all selected patients... \n")
+
+if (length(PID)>=1 & is.null(sampletype)){
+    for (i in seq_along(PID)){
+        # Link featureCounts files
+        inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/roddyExecutionStore/*")       
+        outpath = paste0(outdir, "/", PID[i], "/", "roddyExecutionStore")
+        file.symlink(from= Sys.glob(inputpath), to= outpath)
+        } 
+    } else if (length(PID)>=1 & is.null(sampletype)==F){ # if user specify a sample type
+            
+        for (i in seq_along(PID)){
+            # Link featureCounts files
+            inputpath = paste0(project_folder, "/", PID[i], "/",sampletype,"/paired/merged-alignment/roddyExecutionStore/*")       
+            outpath = paste0(outdir, "/", PID[i], "/", "roddyExecutionStore")
+            file.symlink(from= Sys.glob(inputpath), to= outpath)
+            }
+    }
+
+cat("All softlinks are created!")
