@@ -4,10 +4,10 @@
 
 #####----------- required input ----------#####
 # define path to view-by-pid in project folder 
-project_folder = "/icgc/dkfzlsdf/project/OE0211/mm-sp3/sequencing/rna_sequencing/view-by-pid"
+project_folder = "Path to view-by-pid in project folder"
 
 # define output directory/analysis folder (results_per_pid)
-outdir= "/icgc/dkfzlsdf/analysis/OE0211_projects/mm-sp3/rna_sequencing/results_per_pid"
+outdir= "Path to results_per_pid in analysis folder "
 
 # define PID list (character vector), can be individual cases or the whole cohort 
 PID = list.files(project_folder)
@@ -16,7 +16,9 @@ PID = list.files(project_folder)
 #PID = c("OE0211_MM-SP3_P001", "OE0211_MM-SP3_P002") # multiple IDs 
 
 
-# exclude specific PID(s) from the whole PID list when necessary (character vector)
+# exclude specific PID(s) from the whole PID list when necessary (character vector), default is NULL
+# excludePID = NULL
+# excludePID = scan(file = "path to txt", sep = "\t") # if the list comes from a txt file, it can be read by ths way
 excludePID = "OE0211_MM-SP3_P129"
 
 
@@ -39,6 +41,16 @@ if(!file.exists(outdir)){
 if(file.exists(project_folder)==FALSE){
     stop("The project folder doesn't exist! \n")
     } else {cat("User defined project folder is:", project_folder, "\n")} 
+    
+
+## QC input excludePID
+if (length(excludePID)==0){
+    cat("No PID is excluded")
+} else if(all(excludePID %in% PID)==F){
+    stop("The excludePID below does not exist:", PID[which(!(PID %in% excludePID))], "\n" )
+} else {
+    cat(length(excludePID), "PIDs are excluded by the user")
+}
        
 ## QC input PID
 if(length(PID)==0){
@@ -47,13 +59,14 @@ if(length(PID)==0){
        stop("The PID(s) below DO NOT exist: ", PID[which(PID %in% list.files(project_folder)==F)], " \n")
 } else if (length(excludePID)>=1){
             PID = PID[-match(excludePID,PID)]
-            cat(length(PID), "patients are selected \n")
+            cat(length(PID), "patients are selected (after exclusion) \n")
             } 
 
 ## QC input output directory
 if(file.exists(outdir)==FALSE){
     stop("The output folder doesn't exist! \n")  
 } else {cat("User defined project folder is:", project_folder, "\n")} 
+
 
 ## QC input sampletypes
 viewtypes =  Sys.glob(paste0(project_folder, "/*/"))
