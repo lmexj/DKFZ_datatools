@@ -13,17 +13,17 @@ outdir= "Path to results_per_pid in analysis folder "
 PID = list.files(project_folder)
 #PID = scan(file = "path to txt", sep = "\t") # if the PID list comes from a txt file, it can be read by ths way
 #PID = "test" # single ID
-#PID = c("OE0211_MM-SP3_P001", "OE0211_MM-SP3_P002") # multiple IDs 
+#PID = c("ID1", "ID2") # multiple IDs 
 
 
 # exclude specific PID(s) from the whole PID list when necessary (character vector), default is NULL
-# excludePID = NULL
+excludePID = NULL
 # excludePID = scan(file = "path to txt", sep = "\t") # if the list comes from a txt file, it can be read by ths way
-excludePID = "OE0211_MM-SP3_P129"
+# excludePID = "ID_to_exclude"
 
 
 # define specific sampletype (if there's more than one sample per patient) to link if necessary, default value is NULL
-# make sure you type the correct sampletype (character vector with quation mark, e.g. "tumor1")
+# make sure you type the correct sampletype (character vector with quotation mark, e.g. "tumor1"), the sampletype should be able to differentiate samples!
 sampletype = NULL 
 
 
@@ -46,10 +46,10 @@ if(file.exists(project_folder)==FALSE){
 ## QC input excludePID
 if (length(excludePID)==0){
     cat("No PID is excluded")
-} else if(all(excludePID %in% PID)==F){
+} else if(length(PID)>0 & all(excludePID %in% PID)==F){
     stop("The excludePID below does not exist:", PID[which(!(PID %in% excludePID))], "\n" )
 } else {
-    cat(length(excludePID), "PIDs are excluded by the user")
+    cat(length(excludePID), "PIDs are excluded by the user \n")
 }
        
 ## QC input PID
@@ -296,17 +296,32 @@ cat("Creating softlinks in qualitycontrol folders for all selected patients... \
 
 if (length(PID)>=1 & is.null(sampletype)){
     for (i in seq_along(PID)){
-        # Link featureCounts files
-        inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/qualitycontrol/*")       
-        outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol")
+    
+        SampleType = list.files(paste0(project_folder, "/", PID[i], "/"))
+        # Link qualitycontrol json files
+        inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/qualitycontrol/qualitycontrol.json")       
+        outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol/", SampleType, "_", PID[i], "_","qualitycontrol.json")
+        file.symlink(from= Sys.glob(inputpath), to= outpath)
+        
+        # Link RNAseQC folder
+        inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/qualitycontrol/RNAseQC")       
+        outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol/", SampleType, "_", PID[i], "_","RNAseQC")
         file.symlink(from= Sys.glob(inputpath), to= outpath)
         }   
+        
     } else if (length(PID)>=1 & is.null(sampletype)==F){ # if user specify a sample type
             
         for (i in seq_along(PID)){
-            # Link featureCounts files
-            inputpath = paste0(project_folder, "/", PID[i], "/",sampletype,"/paired/merged-alignment/qualitycontrol/*")       
-            outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol")
+        
+            SampleType <- sampletype
+            # Link qualitycontrol json files
+            inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/qualitycontrol/qualitycontrol.json")       
+        	outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol/", SampleType, "_", PID[i], "_","qualitycontrol.json")
+        	file.symlink(from= Sys.glob(inputpath), to= outpath)
+        
+            # Link RNAseQC folder
+            inputpath = paste0(project_folder, "/", PID[i], "/","*/paired/merged-alignment/qualitycontrol/RNAseQC")       
+            outpath = paste0(outdir, "/", PID[i], "/", "qualitycontrol/", SampleType, "_", PID[i], "_","RNAseQC")
             file.symlink(from= Sys.glob(inputpath), to= outpath)
             }
     }  
